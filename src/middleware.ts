@@ -48,9 +48,12 @@ export default withAuth(
   {
     secret: process.env.NEXTAUTH_SECRET,
     callbacks: {
-      authorized: ({ token }) => {
+      authorized: ({ req, token }) => {
+        console.log(`[Middleware Authorized Callback] Path:`, req.nextUrl.pathname);
         console.log(`[Middleware Authorized Callback] Token exists:`, !!token);
         console.log(`[Middleware Authorized Callback] NEXTAUTH_SECRET defined:`, !!process.env.NEXTAUTH_SECRET, `Length:`, process.env.NEXTAUTH_SECRET?.length);
+        console.log(`[Middleware Authorized Callback] Cookies:`, JSON.stringify(req.cookies.getAll().map(c => ({ name: c.name, valueLength: c.value?.length }))));
+        console.log(`[Middleware Authorized Callback] Headers X-Forwarded-Proto:`, req.headers.get('x-forwarded-proto'));
         return !!token;
       },
     },
