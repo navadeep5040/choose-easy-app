@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+mongoose.set('bufferCommands', false);
+
 const MONGODB_URI = process.env.MONGODB_URI;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -19,7 +21,7 @@ function setupMongooseMocks() {
 
   console.warn("[MongoDB Mock] Connection failed or unresolvable. Initializing in-memory mock fallback.");
 
-  const store = {
+  const store: Record<string, any[]> = {
     users: [] as any[],
     mentors: [] as any[],
     courses: [] as any[],
@@ -27,6 +29,9 @@ function setupMongooseMocks() {
     payments: [] as any[],
     notifications: [] as any[],
     pricingplans: [] as any[],
+    chatsessions: [] as any[],
+    careers: [] as any[],
+    reviews: [] as any[],
   };
 
   // Create seed users
@@ -122,119 +127,256 @@ function setupMongooseMocks() {
   const Notification = require('../models/Notification').default;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const PricingPlan = require('../models/PricingPlan').default;
-
-  function makeQueryChain(result: any) {
-    const chain: any = {
-      select: () => chain,
-      populate: () => chain,
-      lean: () => chain,
-      sort: () => chain,
-      limit: () => chain,
-      exec: async () => result,
-      then: (resolve: any) => Promise.resolve(result).then(resolve),
-      catch: (reject: any) => Promise.resolve(result).catch(reject),
-    };
-    return chain;
-  }
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const Career = require('../models/Career').default;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const ChatSession = require('../models/ChatSession').default;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const Review = require('../models/Review').default;
 
   function toDoc(model: any, data: any) {
     if (!data) return null;
     const doc = new model(data);
     doc._id = data._id || doc._id;
-    doc.save = async function() {
-      // Find and update in store
-      const uIdx = store.users.findIndex(x => x._id.toString() === doc._id.toString());
-      if (uIdx !== -1) store.users[uIdx] = { ...store.users[uIdx], ...doc.toObject() };
-
-      const mIdx = store.mentors.findIndex(x => x._id.toString() === doc._id.toString());
-      if (mIdx !== -1) store.mentors[mIdx] = { ...store.mentors[mIdx], ...doc.toObject() };
-
-      const bIdx = store.bookings.findIndex(x => x._id.toString() === doc._id.toString());
-      if (bIdx !== -1) store.bookings[bIdx] = { ...store.bookings[bIdx], ...doc.toObject() };
-
-      return doc;
-    };
     return doc;
   }
 
-  User.findOne = function(query: any) {
-    let u = null;
-    if (query?.email) {
-      u = store.users.find(x => x.email.toLowerCase() === query.email.toLowerCase());
+  function getStoreKey(modelName: string): string {
+    const name = modelName.toLowerCase();
+    if (name.endsWith('y')) {
+      return name.slice(0, -1) + 'ies';
     }
-    return makeQueryChain(toDoc(User, u));
-  };
+    return name + 's';
+  }
 
-  User.findById = function(id: any) {
-    const u = store.users.find(x => x._id.toString() === id.toString());
-    return makeQueryChain(toDoc(User, u));
-  };
+  function matchesFilter(item: any, filter: any): boolean {
+    if (!filter) return true;
+    for (const key of Object.keys(filter)) {
+      const val = filter[key];
+      const itemVal = item[key];
+      
+      if (key === '_id' || key === 'id') {
+        const filterId = val?.toString();
+        const itemId = itemVal?.toString() || item._id?.toString();
+        if (val && typeof val === 'object' && '$in' in val) {
+          const arr = val['$in'];
+          if (Array.isArray(arr)) {
+            if (!arr.map(x => x?.toString()).includes(itemId)) return false;
+            continue;
+          }
+        }
+        if (filterId !== itemId) return false;
+        continue;
+      }
 
-  User.create = async function(data: any) {
-    const hash = data.password ? (data.password.startsWith('$2a$') ? data.password : bcrypt.hashSync(data.password, 10)) : '';
-    const newU = {
-      _id: new mongoose.Types.ObjectId(),
-      ...data,
-      password: hash,
-      createdAt: new Date(),
-    };
-    store.users.push(newU);
-    return toDoc(User, newU);
-  };
+      if (val && typeof val === 'object' && '$in' in val) {
+        const arr = val['$in'];
+        if (!Array.isArray(arr)) return false;
+        const strArr = arr.map(x => x?.toString());
+        if (!strArr.includes(itemVal?.toString())) return false;
+        continue;
+      }
 
-  Mentor.find = function() {
-    const docs = store.mentors.map(m => toDoc(Mentor, m));
-    return makeQueryChain(docs);
-  };
-
-  Mentor.findOne = function(query: any) {
-    let m = null;
-    if (query?.userId) {
-      m = store.mentors.find(x => x.userId.toString() === query.userId.toString());
-    } else if (query?.name) {
-      m = store.mentors.find(x => x.name === query.name);
+      const valStr = val instanceof mongoose.Types.ObjectId ? val.toString() : val;
+      const itemValStr = itemVal instanceof mongoose.Types.ObjectId ? itemVal.toString() : itemVal;
+      
+      if (typeof valStr === 'string' && typeof itemValStr === 'string' && key.toLowerCase() === 'email') {
+        if (valStr.toLowerCase() !== itemValStr.toLowerCase()) return false;
+      } else if (valStr !== itemValStr) {
+        return false;
+      }
     }
-    return makeQueryChain(toDoc(Mentor, m));
+    return true;
+  }
+
+  // Intercept mongoose Query prototype exec
+  const originalQueryExec = mongoose.Query.prototype.exec;
+  mongoose.Query.prototype.exec = async function(this: any, ...args: any[]) {
+    if (mocksApplied) {
+      const modelName = this.model.modelName;
+      const op = this.op;
+      const filter = this.getFilter() || {};
+      const update = this.getUpdate();
+      
+      const collectionName = getStoreKey(modelName);
+      let storeList = store[collectionName];
+      if (!storeList) {
+        storeList = store[collectionName] = [];
+      }
+
+      console.warn(`[Mock Query] Intercepted ${modelName}.${op} with filter:`, JSON.stringify(filter));
+
+      const matchedItems = storeList.filter((item: any) => matchesFilter(item, filter));
+
+      if (op === 'find') {
+        let result = matchedItems.map((item: any) => toDoc(this.model, item));
+        
+        const sortOptions = this.options.sort;
+        if (sortOptions) {
+          const sortKey = Object.keys(sortOptions)[0];
+          const sortOrder = sortOptions[sortKey];
+          result.sort((a: any, b: any) => {
+            const valA = a[sortKey];
+            const valB = b[sortKey];
+            if (valA < valB) return sortOrder === -1 || sortOrder === 'desc' ? 1 : -1;
+            if (valA > valB) return sortOrder === -1 || sortOrder === 'desc' ? -1 : 1;
+            return 0;
+          });
+        }
+        
+        const limitOption = this.options.limit;
+        if (typeof limitOption === 'number') {
+          result = result.slice(0, limitOption);
+        }
+
+        return result;
+      }
+
+      if (op === 'findOne') {
+        const item = matchedItems[0];
+        return item ? toDoc(this.model, item) : null;
+      }
+
+      if (op === 'findById') {
+        const targetId = filter._id || filter;
+        const item = storeList.find((x: any) => x._id.toString() === targetId.toString());
+        return item ? toDoc(this.model, item) : null;
+      }
+
+      if (op === 'countDocuments') {
+        return matchedItems.length;
+      }
+
+      if (op === 'updateMany' || op === 'updateOne') {
+        let modifiedCount = 0;
+        const updatePayload = update ? (update.$set || update) : {};
+        matchedItems.forEach((item: any) => {
+          const idx = storeList.findIndex((x: any) => x._id.toString() === item._id.toString());
+          if (idx !== -1) {
+            storeList[idx] = { ...storeList[idx], ...updatePayload };
+            modifiedCount++;
+          }
+        });
+        return { acknowledged: true, modifiedCount, matchedCount: matchedItems.length };
+      }
+
+      if (op === 'deleteOne' || op === 'deleteMany') {
+        let deletedCount = 0;
+        matchedItems.forEach((item: any) => {
+          const idx = storeList.findIndex((x: any) => x._id.toString() === item._id.toString());
+          if (idx !== -1) {
+            storeList.splice(idx, 1);
+            deletedCount++;
+          }
+        });
+        return { acknowledged: true, deletedCount };
+      }
+
+      if (op === 'findOneAndUpdate') {
+        const item = matchedItems[0];
+        if (item) {
+          const updatePayload = update ? (update.$set || update) : {};
+          const idx = storeList.findIndex((x: any) => x._id.toString() === item._id.toString());
+          if (idx !== -1) {
+            storeList[idx] = { ...storeList[idx], ...updatePayload };
+            return toDoc(this.model, storeList[idx]);
+          }
+        }
+        return null;
+      }
+
+      return matchedItems.map((item: any) => toDoc(this.model, item));
+    }
+    return originalQueryExec.apply(this, args as any);
   };
 
-  Mentor.findById = function(id: any) {
-    const m = store.mentors.find(x => x._id.toString() === id.toString());
-    return makeQueryChain(toDoc(Mentor, m));
+  // Intercept Document prototype save
+  const originalModelSave = mongoose.Model.prototype.save;
+  mongoose.Model.prototype.save = async function(this: any, ...args: any[]) {
+    if (mocksApplied) {
+      const modelName = this.constructor.modelName;
+      const collectionName = getStoreKey(modelName);
+      let storeList = store[collectionName];
+      if (!storeList) {
+        storeList = store[collectionName] = [];
+      }
+      
+      console.warn(`[Mock Save] Intercepted ${modelName}.save() for ID:`, this._id);
+      
+      const idx = storeList.findIndex((x: any) => x._id.toString() === this._id.toString());
+      if (idx !== -1) {
+        storeList[idx] = { ...storeList[idx], ...this.toObject() };
+      } else {
+        storeList.push(this.toObject());
+      }
+      return this;
+    }
+    return originalModelSave.apply(this, args as any);
   };
 
-  Mentor.create = async function(data: any) {
-    const newM = {
-      _id: new mongoose.Types.ObjectId(),
-      ...data,
-      createdAt: new Date(),
-    };
-    store.mentors.push(newM);
-    return toDoc(Mentor, newM);
+  // Intercept Model.create
+  const originalModelCreate = mongoose.Model.create;
+  // @ts-ignore
+  mongoose.Model.create = async function(this: any, doc: any, ...args: any[]) {
+    if (mocksApplied) {
+      const modelName = this.modelName;
+      const collectionName = getStoreKey(modelName);
+      let storeList = store[collectionName];
+      if (!storeList) {
+        storeList = store[collectionName] = [];
+      }
+      
+      const processSingle = async (item: any) => {
+        const hash = item.password 
+          ? (item.password.startsWith('$2a$') ? item.password : bcrypt.hashSync(item.password, 10)) 
+          : '';
+        const newItem = {
+          _id: item._id || new mongoose.Types.ObjectId(),
+          ...item,
+          password: hash,
+          createdAt: new Date(),
+        };
+        storeList.push(newItem);
+        return toDoc(this, newItem);
+      };
+
+      if (Array.isArray(doc)) {
+        const results = [];
+        for (const item of doc) {
+          results.push(await processSingle(item));
+        }
+        return results;
+      } else {
+        return await processSingle(doc);
+      }
+    }
+    return originalModelCreate.apply(this, [doc, ...args] as any);
   };
 
-  Course.find = function() {
-    const docs = store.courses.map(c => toDoc(Course, c));
-    return makeQueryChain(docs);
+  // Intercept Model.insertMany
+  const originalModelInsertMany = mongoose.Model.insertMany;
+  // @ts-ignore
+  mongoose.Model.insertMany = async function(this: any, docs: any[], ...args: any[]) {
+    if (mocksApplied) {
+      const modelName = this.modelName;
+      const collectionName = getStoreKey(modelName);
+      let storeList = store[collectionName];
+      if (!storeList) {
+        storeList = store[collectionName] = [];
+      }
+      const docsToInsert = Array.isArray(docs) ? docs : [docs];
+      const inserted = docsToInsert.map((d: any) => {
+        const item = {
+          _id: d._id || new mongoose.Types.ObjectId(),
+          ...d,
+        };
+        storeList.push(item);
+        return toDoc(this, item);
+      });
+      return inserted;
+    }
+    return originalModelInsertMany.apply(this, [docs, ...args] as any);
   };
-
-  Booking.find = function() {
-    const docs = store.bookings.map(b => toDoc(Booking, b));
-    return makeQueryChain(docs);
-  };
-
-  Booking.create = async function(data: any) {
-    const newB = {
-      _id: new mongoose.Types.ObjectId(),
-      ...data,
-      createdAt: new Date(),
-    };
-    store.bookings.push(newB);
-    return toDoc(Booking, newB);
-  };
-
-  Payment.find = function() { return makeQueryChain([]); };
-  Notification.find = function() { return makeQueryChain([]); };
-  PricingPlan.find = function() { return makeQueryChain([]); };
 }
 
 async function connectToDatabase() {
