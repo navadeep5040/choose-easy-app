@@ -3,8 +3,13 @@ import { NextResponse } from "next/server";
 
 export default withAuth(
   function middleware(req) {
-    const role = req.nextauth.token?.role as string | undefined;
     const { pathname } = req.nextUrl;
+    const token = req.nextauth.token;
+    const role = token?.role as string | undefined;
+
+    console.log(`[Middleware Log] Path: ${pathname}`);
+    console.log(`[Middleware Log] Token:`, JSON.stringify(token));
+    console.log(`[Middleware Log] Cookies:`, JSON.stringify(req.cookies.getAll().map(c => ({ name: c.name, valueLength: c.value?.length }))));
 
     // 1. Admin paths security & redirects
     if (pathname.startsWith("/admin")) {
@@ -42,7 +47,10 @@ export default withAuth(
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token,
+      authorized: ({ token }) => {
+        console.log(`[Middleware Authorized Callback] Token exists:`, !!token);
+        return !!token;
+      },
     },
   }
 );
