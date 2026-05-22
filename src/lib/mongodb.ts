@@ -39,8 +39,13 @@ function setupMongooseMocks() {
   const mentorHash = bcrypt.hashSync('Mentor@123', 10);
   const studentHash = bcrypt.hashSync('Student@123', 10);
 
+  const adminId = new mongoose.Types.ObjectId('65f1a2b3c4d5e6f7a8b9c001');
+  const mentorUserId = new mongoose.Types.ObjectId('65f1a2b3c4d5e6f7a8b9c002');
+  const studentId = new mongoose.Types.ObjectId('65f1a2b3c4d5e6f7a8b9c003');
+  const mentorProfileId = new mongoose.Types.ObjectId('65f1a2b3c4d5e6f7a8b9c004');
+
   const adminUser = {
-    _id: new mongoose.Types.ObjectId(),
+    _id: adminId,
     email: 'admin@chooseeasy.ai',
     password: adminHash,
     name: 'Alex Morgan',
@@ -49,7 +54,7 @@ function setupMongooseMocks() {
   };
 
   const mentorUser = {
-    _id: new mongoose.Types.ObjectId(),
+    _id: mentorUserId,
     email: 'mentor@chooseeasy.ai',
     password: mentorHash,
     name: 'Sarah Johnson',
@@ -58,7 +63,7 @@ function setupMongooseMocks() {
   };
 
   const studentUser = {
-    _id: new mongoose.Types.ObjectId(),
+    _id: studentId,
     email: 'student@chooseeasy.ai',
     password: studentHash,
     name: 'Navadeep Kumar',
@@ -70,7 +75,7 @@ function setupMongooseMocks() {
 
   // Mentor profile
   const mentorProfile = {
-    _id: new mongoose.Types.ObjectId(),
+    _id: mentorProfileId,
     userId: mentorUser._id,
     name: 'Sarah Johnson',
     bio: 'Expert AI and Software Engineering mentor.',
