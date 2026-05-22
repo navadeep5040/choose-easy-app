@@ -391,6 +391,8 @@ async function connectToDatabase() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
+      serverSelectionTimeoutMS: 1000,
+      connectTimeoutMS: 1000,
     };
 
     let connectionUri = MONGODB_URI;
