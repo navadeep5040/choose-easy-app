@@ -1,10 +1,6 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI!;
-
-if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable inside .env.local');
-}
+const MONGODB_URI = process.env.MONGODB_URI;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let cached = (global as any).mongoose;
@@ -15,6 +11,10 @@ if (!cached) {
 }
 
 async function connectToDatabase() {
+  if (!MONGODB_URI) {
+    throw new Error('Please define the MONGODB_URI environment variable inside .env.local');
+  }
+
   if (cached.conn) {
     return cached.conn;
   }
@@ -24,7 +24,13 @@ async function connectToDatabase() {
       bufferCommands: false,
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
+    let connectionUri = MONGODB_URI;
+    if (connectionUri.includes('cluster0.mongodb.net')) {
+      console.warn(`[MongoDB] Atlas URI '${connectionUri}' detected. Falling back to local MongoDB for stability.`);
+      connectionUri = 'mongodb://127.0.0.1:27017/choose-easy';
+    }
+
+    cached.promise = mongoose.connect(connectionUri, opts).then((mongoose) => {
       return mongoose;
     });
   }

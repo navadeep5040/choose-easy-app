@@ -68,7 +68,7 @@ export default function ProfilePage() {
         if (data.code === 'SESSION_INVALID' || res.status === 401) {
           showToast("Session expired — please log in again", "error");
           await signOut({ redirect: false });
-          router.replace("/login?reason=session_expired");
+          window.location.href = "/login?reason=session_expired";
           return;
         }
         setError(data.error || `Failed to load profile (Status: ${res.status})`);

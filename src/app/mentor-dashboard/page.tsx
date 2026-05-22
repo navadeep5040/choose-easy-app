@@ -92,15 +92,19 @@ export default function MentorDashboardPage() {
       }
     }
 
-    if (hasFetched.current) return;
-    hasFetched.current = true;
-
     const role = (session.user as { role?: string }).role;
+    if (!role) {
+      return;
+    }
+
     if (role !== "mentor") {
       const url = role === "pending_mentor" ? "/dashboard?mentor=pending" : "/dashboard";
       router.push(url);
       return;
     }
+
+    if (hasFetched.current) return;
+    hasFetched.current = true;
 
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -305,6 +309,17 @@ export default function MentorDashboardPage() {
   const pendingBookings = bookings.filter((b) => b.status === "Pending");
   const confirmedBookings = bookings.filter((b) => b.status === "Confirmed");
   const completedBookings = bookings.filter((b) => b.status === "Completed");
+
+  if (authStatus === "loading" || (!session && authStatus !== "unauthenticated")) {
+    return <DashboardLoading message="LOADING MENTOR DASHBOARD..." />;
+  }
+
+  if (!session) return null;
+
+  const role = (session.user as { role?: string }).role;
+  if (role !== "mentor") {
+    return <DashboardLoading message="REDIRECTING..." />;
+  }
 
   if (isLoading) {
     return <DashboardLoading message="LOADING MENTOR DASHBOARD..." />;

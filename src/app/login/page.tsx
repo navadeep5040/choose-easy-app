@@ -43,7 +43,7 @@ function LoginForm() {
       } else {
         const session = await getSession();
         const role = session?.user?.role;
-        router.push(getHomePathForRole(role));
+        window.location.href = getHomePathForRole(role);
       }
     } else {
       const res = await fetch("/api/auth/register", {

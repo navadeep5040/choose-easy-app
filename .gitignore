@@ -31,6 +31,7 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files
+.env.local
 .env*
 
 # vercel
@@ -46,3 +47,4 @@ next-env.d.ts
 src/test-profile-api.js
 src/test-profile-e2e.js
 src/verify-all-roles.js
+/mongodb_data/

@@ -6,17 +6,38 @@ export default withAuth(
     const role = req.nextauth.token?.role as string | undefined;
     const { pathname } = req.nextUrl;
 
-    if (pathname.startsWith("/admin") && role !== "admin") {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
+    // 1. Admin paths security & redirects
+    if (pathname.startsWith("/admin")) {
+      if (role !== "admin") {
+        if (role === "mentor") {
+          return NextResponse.redirect(new URL("/mentor-dashboard", req.url));
+        }
+        return NextResponse.redirect(new URL("/dashboard", req.url));
+      }
     }
 
-    // Only approved mentors may access mentor dashboard
-    if (pathname.startsWith("/mentor-dashboard") && role !== "mentor") {
-      const url = new URL("/dashboard", req.url);
-      if (role === "pending_mentor") {
-        url.searchParams.set("mentor", "pending");
+    // 2. Mentor dashboard security & redirects
+    if (pathname.startsWith("/mentor-dashboard")) {
+      if (role !== "mentor") {
+        if (role === "admin") {
+          return NextResponse.redirect(new URL("/admin", req.url));
+        }
+        const url = new URL("/dashboard", req.url);
+        if (role === "pending_mentor") {
+          url.searchParams.set("mentor", "pending");
+        }
+        return NextResponse.redirect(url);
       }
-      return NextResponse.redirect(url);
+    }
+
+    // 3. Student dashboard redirects (only user & pending_mentor should access)
+    if (pathname === "/dashboard") {
+      if (role === "admin") {
+        return NextResponse.redirect(new URL("/admin", req.url));
+      }
+      if (role === "mentor") {
+        return NextResponse.redirect(new URL("/mentor-dashboard", req.url));
+      }
     }
   },
   {

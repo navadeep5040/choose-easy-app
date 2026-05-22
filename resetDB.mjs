@@ -216,10 +216,15 @@ const COURSES_DATA = [
 ];
 
 async function resetAndSeed() {
-  const uri = process.env.MONGODB_URI;
+  let uri = process.env.MONGODB_URI;
   if (!uri) {
     console.error('No MONGODB_URI found in .env.local');
     process.exit(1);
+  }
+
+  if (uri.includes('cluster0.mongodb.net')) {
+    console.warn(`[MongoDB] Atlas URI '${uri}' detected. Falling back to local MongoDB for seeding.`);
+    uri = 'mongodb://127.0.0.1:27017/choose-easy';
   }
 
   try {
@@ -239,12 +244,42 @@ async function resetAndSeed() {
     console.log('\n--- STEP 2: Creating Admin user ---');
     const adminHashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
     await User.create({ email: 'admin@chooseeasy.com', password: adminHashedPassword, name: 'System Admin', role: 'admin' });
+    const reqAdminHashed = await bcrypt.hash('Admin@123', 10);
+    await User.create({ email: 'admin@chooseeasy.ai', password: reqAdminHashed, name: 'Alex Morgan', role: 'admin' });
     console.log(`  Admin created: admin@chooseeasy.com / ${ADMIN_PASSWORD}`);
+    console.log(`  Required Admin created: admin@chooseeasy.ai / Admin@123`);
 
     // Step 3: Create Mentor users + Mentor profiles
     console.log('\n--- STEP 3: Creating Mentors ---');
     const mentorHashedPassword = await bcrypt.hash(MENTOR_PASSWORD, 10);
     const createdMentors = {};
+
+    // Seed the required test mentor first
+    const reqMentorHashed = await bcrypt.hash('Mentor@123', 10);
+    const reqMentorUser = await User.create({ email: 'mentor@chooseeasy.ai', password: reqMentorHashed, name: 'Sarah Johnson', role: 'mentor' });
+    const reqMentorProfile = await Mentor.create({
+      userId: reqMentorUser._id,
+      name: 'Sarah Johnson',
+      bio: 'Expert AI and Software Engineering mentor with a track record of guiding students to high-paying careers.',
+      subjects: ['Technology'],
+      domain: 'Software Engineering',
+      matchScore: '99%',
+      status: 'Available',
+      availability: [
+        { day: 'Monday', startTime: '09:00', endTime: '11:00' },
+        { day: 'Wednesday', startTime: '13:00', endTime: '15:00' },
+        { day: 'Friday', startTime: '15:00', endTime: '17:00' }
+      ],
+      hourlyRate: 50,
+      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCTNqAD1MfR5-BlRFrNni7hp3_hW-BHLKyDrejzDN5mIjK6mid6w7UMmaYLEeHuP45RsqWR53jMe5oZkLaddAzJi0ct1j75xMV2C5JPYAhCDCd1hd2y5eJ0NQqv6781swV3vRpTv0WaY86DQ1BicN58iopEq2EO2NmNAUMwY-mM6L4uvM3nnxX07CtracYYtyjCSwnn0xUow9VH8upaIQAqPV9hkx-ri_sI_7NiXYvc96boLmIF8m3fWaXRYrkT3MQPVStfCuA3WAY',
+    });
+    createdMentors['Sarah Johnson'] = reqMentorProfile._id;
+    console.log(`  Required Mentor created: mentor@chooseeasy.ai / Mentor@123`);
+
+    // Seed the required test student
+    const reqStudentHashed = await bcrypt.hash('Student@123', 10);
+    await User.create({ email: 'student@chooseeasy.ai', password: reqStudentHashed, name: 'Navadeep Kumar', role: 'user' });
+    console.log(`  Required Student created: student@chooseeasy.ai / Student@123`);
 
     for (const md of MENTORS_DATA) {
       const mentorUser = await User.create({ email: md.email, password: mentorHashedPassword, name: md.name, role: 'mentor' });

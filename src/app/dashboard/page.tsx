@@ -133,6 +133,9 @@ export default function DashboardPage() {
       router.push("/login");
       return;
     }
+    if (!userRole) {
+      return;
+    }
     if (userRole === "admin") {
       router.push("/admin");
       return;
@@ -236,8 +239,8 @@ export default function DashboardPage() {
 
   if (!session) return null;
 
-  if (userRole === "admin" || userRole === "mentor") {
-    return <DashboardLoading message="REDIRECTING TO DASHBOARD..." />;
+  if (userRole !== "user" && userRole !== "pending_mentor") {
+    return <DashboardLoading message="REDIRECTING..." />;
   }
 
   if (isLoading && bookings.length === 0) {
@@ -273,19 +276,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {userRole === "mentor" && (
-        <div className="glass-panel p-4 sm:p-5 rounded-xl border border-primary/30 mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <p className="font-body-md text-on-surface-variant text-sm">
-            Your mentor account is active. Manage sessions from your mentor dashboard.
-          </p>
-          <Link
-            href="/mentor-dashboard"
-            className="px-5 py-2.5 bg-primary text-surface rounded-lg font-mono-label text-xs uppercase hover:shadow-[0_0_15px_rgba(47,217,244,0.3)] transition-all text-center shrink-0"
-          >
-            Open Mentor Dashboard
-          </Link>
-        </div>
-      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8 sm:mb-10">
         <StatCard label="Pending" value={pendingBookings.length} accent="error" icon="pending_actions" />
