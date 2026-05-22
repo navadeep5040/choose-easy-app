@@ -25,7 +25,7 @@ async function connectToDatabase() {
     };
 
     let connectionUri = MONGODB_URI;
-    if (connectionUri.includes('cluster0.mongodb.net')) {
+    if (connectionUri.includes('cluster0.mongodb.net') && !process.env.VERCEL) {
       console.warn(`[MongoDB] Atlas URI '${connectionUri}' detected. Falling back to local MongoDB for stability.`);
       connectionUri = 'mongodb://127.0.0.1:27017/choose-easy';
     }
