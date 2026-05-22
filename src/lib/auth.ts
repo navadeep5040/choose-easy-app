@@ -1,7 +1,7 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
-import connectToDatabase, { isMockDatabase } from './mongodb';
+import connectToDatabase from './mongodb';
 import User from '../models/User';
 
 export const authOptions: NextAuthOptions = {
@@ -57,9 +57,6 @@ export const authOptions: NextAuthOptions = {
       if (token?.id) {
         try {
           await connectToDatabase();
-          if (isMockDatabase()) {
-            return token;
-          }
           const dbUser = await User.findById(token.id).select('role').lean();
           if (dbUser) {
             token.role = (dbUser as any).role;

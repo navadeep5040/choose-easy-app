@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import connectToDatabase, { isMockDatabase } from '@/lib/mongodb';
+import connectToDatabase from '@/lib/mongodb';
 import User from '@/models/User';
 import Booking from '@/models/Booking';
 import Payment from '@/models/Payment';
@@ -19,19 +19,9 @@ export async function GET() {
     let user = await User.findById(userId).select('-password -resetToken -resetTokenExpiry');
 
     if (!user) {
-      if (isMockDatabase()) {
-        user = await User.create({
-          _id: userId,
-          email: session.user.email,
-          name: session.user.name || 'Test User',
-          role: (session.user as any).role || 'user',
-          createdAt: new Date(),
-        });
-      } else {
-        // User ID in session no longer exists in DB (stale session after DB reset).
-        // Return 401 with a SESSION_INVALID code so the client can force sign-out.
-        return NextResponse.json({ error: 'User not found', code: 'SESSION_INVALID' }, { status: 401 });
-      }
+      // User ID in session no longer exists in DB (stale session after DB reset).
+      // Return 401 with a SESSION_INVALID code so the client can force sign-out.
+      return NextResponse.json({ error: 'User not found', code: 'SESSION_INVALID' }, { status: 401 });
     }
 
     // Fetch stats based on role
@@ -47,21 +37,7 @@ export async function GET() {
       confirmedSessions = await Booking.countDocuments({ mentorUserId: userId, status: 'Confirmed' });
       
       const Mentor = (await import('@/models/Mentor')).default;
-      let mentorDoc = await Mentor.findOne({ userId });
-      if (!mentorDoc && isMockDatabase()) {
-        mentorDoc = await Mentor.create({
-          userId,
-          name: user.name || 'Test Mentor',
-          domain: 'Technology',
-          subjects: ['Technology'],
-          status: 'Available',
-          availability: [
-            { day: 'Monday', startTime: '09:00', endTime: '11:00' },
-            { day: 'Wednesday', startTime: '13:00', endTime: '15:00' },
-            { day: 'Friday', startTime: '15:00', endTime: '17:00' }
-          ]
-        });
-      }
+      const mentorDoc = await Mentor.findOne({ userId });
       if (mentorDoc) {
         totalPayments = await Payment.countDocuments({ mentorId: mentorDoc._id, status: 'completed' });
         totalSpent = (await Payment.find({ mentorId: mentorDoc._id, status: 'completed' }))

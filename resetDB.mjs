@@ -222,11 +222,6 @@ async function resetAndSeed() {
     process.exit(1);
   }
 
-  if (uri.includes('cluster0.mongodb.net')) {
-    console.warn(`[MongoDB] Atlas URI '${uri}' detected. Falling back to local MongoDB for seeding.`);
-    uri = 'mongodb://127.0.0.1:27017/choose-easy';
-  }
-
   try {
     console.log(`Connecting to database at ${uri}...`);
     await mongoose.connect(uri);
