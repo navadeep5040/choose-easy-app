@@ -46,9 +46,11 @@ export default withAuth(
     }
   },
   {
+    secret: process.env.NEXTAUTH_SECRET,
     callbacks: {
       authorized: ({ token }) => {
         console.log(`[Middleware Authorized Callback] Token exists:`, !!token);
+        console.log(`[Middleware Authorized Callback] NEXTAUTH_SECRET defined:`, !!process.env.NEXTAUTH_SECRET, `Length:`, process.env.NEXTAUTH_SECRET?.length);
         return !!token;
       },
     },
