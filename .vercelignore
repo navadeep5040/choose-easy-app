@@ -1,0 +1,6 @@
+mongodb_data
+scratch
+.next
+node_modules
+public/uploads
+.env.local
