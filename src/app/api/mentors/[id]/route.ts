@@ -76,7 +76,7 @@ export async function PUT(
     const updatedMentor = await Mentor.findByIdAndUpdate(
       id,
       { name, domain, matchScore, status, bio, subjects, availability, hourlyRate, image },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!updatedMentor) {

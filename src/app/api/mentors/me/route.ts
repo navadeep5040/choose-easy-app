@@ -90,7 +90,7 @@ export async function PUT(req: Request) {
       }
     }
 
-    const updated = await Mentor.findByIdAndUpdate(mentor._id, updates, { new: true });
+    const updated = await Mentor.findByIdAndUpdate(mentor._id, updates, { returnDocument: 'after' });
     return NextResponse.json(updated);
   } catch (error) {
     console.error('Error updating mentor profile:', error);

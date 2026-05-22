@@ -60,7 +60,7 @@ export async function PUT(
         ...(image !== undefined && { image }),
         ...(isActive !== undefined && { isActive }),
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!course) {

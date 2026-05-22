@@ -93,7 +93,7 @@ export async function PUT(req: Request) {
     if (bio !== undefined) updateFields.bio = bio;
     if (avatar !== undefined) updateFields.avatar = avatar;
 
-    const user = await User.findByIdAndUpdate(userId, updateFields, { new: true })
+    const user = await User.findByIdAndUpdate(userId, updateFields, { returnDocument: 'after' })
       .select('-password -resetToken -resetTokenExpiry');
 
     if (!user) {

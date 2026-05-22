@@ -57,7 +57,7 @@ export async function PUT(
         badge,
         sortOrder: Number(sortOrder) || 0,
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!updated) {
