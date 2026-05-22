@@ -382,6 +382,30 @@ function setupMongooseMocks() {
     }
     return originalModelInsertMany.apply(this, [docs, ...args] as any);
   };
+
+  // Intercept Aggregate prototype exec
+  const originalAggregateExec = mongoose.Aggregate.prototype.exec;
+  mongoose.Aggregate.prototype.exec = async function(this: any, ...args: any[]) {
+    if (mocksApplied) {
+      const model = this._model;
+      const modelName = model ? model.modelName : '';
+      console.warn(`[Mock Aggregate] Intercepted ${modelName}.aggregate()`);
+      if (modelName === 'ChatSession') {
+        const chats = store.chatsessions || [];
+        let totalMessages = 0;
+        chats.forEach((c: any) => { if (Array.isArray(c.messages)) totalMessages += c.messages.length; });
+        return [{ _id: null, total: totalMessages }];
+      }
+      if (modelName === 'Review') {
+        const reviews = store.reviews || [];
+        if (reviews.length === 0) return [];
+        const totalRating = reviews.reduce((sum: number, r: any) => sum + (r.rating || 0), 0);
+        return [{ _id: null, avgRating: totalRating / reviews.length }];
+      }
+      return [];
+    }
+    return originalAggregateExec.apply(this, args as any);
+  };
 }
 
 async function connectToDatabase() {
