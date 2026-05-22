@@ -15,6 +15,10 @@ if (!cached) {
 
 let mocksApplied = false;
 
+export function isMockDatabase() {
+  return mocksApplied;
+}
+
 function setupMongooseMocks() {
   if (mocksApplied) return;
   mocksApplied = true;
@@ -414,6 +418,13 @@ async function connectToDatabase() {
   }
 
   if (cached.conn) {
+    return cached.conn;
+  }
+
+  if (process.env.VERCEL && MONGODB_URI.includes('cluster0.mongodb.net')) {
+    console.warn("[MongoDB] Running on Vercel with template Atlas URI. Direct fallback to mock database.");
+    setupMongooseMocks();
+    cached.conn = mongoose.connection;
     return cached.conn;
   }
 

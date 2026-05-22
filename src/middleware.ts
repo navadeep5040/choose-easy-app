@@ -5,8 +5,8 @@ import { getToken } from "next-auth/jwt";
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  const isVercel = process.env.VERCEL === "1";
-  const isHttps = req.nextUrl.protocol === "https:";
+  const isVercel = process.env.VERCEL === "1" || !!process.env.VERCEL;
+  const isHttps = req.nextUrl.protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
   const secureCookie = isVercel || isHttps;
 
   // Retrieve token using getToken with explicit options
@@ -21,8 +21,11 @@ export async function middleware(req: NextRequest) {
   console.log(`[Middleware Custom] Token exists: ${!!token}`);
   console.log(`[Middleware Custom] NEXTAUTH_SECRET defined: ${!!process.env.NEXTAUTH_SECRET} Length: ${process.env.NEXTAUTH_SECRET?.length}`);
 
-  // If no token exists, redirect to login
-  if (!token) {
+  // If no token exists, or session token is corrupted (missing role or id), redirect to login
+  if (!token || !token.role || !token.id) {
+    if (token) {
+      console.warn(`[Middleware Custom] Incomplete/corrupted session token detected for path ${pathname}. Redirecting to login.`);
+    }
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("callbackUrl", req.url);
     return NextResponse.redirect(loginUrl);
